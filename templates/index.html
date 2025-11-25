@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuerySense AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        /* ============================================================
+           SECTION 1: Scrollbar Styling for Chat Container
+           ============================================================ */
+        #chat-container::-webkit-scrollbar { width: 6px; }
+        #chat-container::-webkit-scrollbar-track { background: #f1f1f1; }
+        #chat-container::-webkit-scrollbar-thumb { background: #888; border-radius: 3px; }
+        #chat-container::-webkit-scrollbar-thumb:hover { background: #555; }
+        
+        /* ============================================================
+           SECTION 2: Chart Container
+           ============================================================ */
+        .chart-wrapper {
+            width: 100%;
+            background: white;
+            border-radius: 0.5rem;
+            padding: 1rem;
+        }
+        
+        .chart-container {
+            height: 320px;
+            position: relative;
+        }
+        
+        canvas {
+            display: block;
+        }
+        
+        /* Chart title styling */
+        .chat-message.bot .chart-title {
+            color: #1f2937;
+            margin-bottom: 1rem;
+            font-weight: 600;
+            font-size: 1rem;
+            text-align: center;
+        }
+        
+        /* ============================================================
+           SECTION 3: Formatted Answer Styling
+           ============================================================ */
+        .formatted-answer {
+            line-height: 1.7;
+        }
+        
+        .formatted-answer .intro-text {
+            color: #e5e7eb;
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+        }
+        
+        .formatted-answer .insights-section {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
+            border-left: 4px solid #6366f1;
+            padding: 1rem 1.25rem;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+        }
+        
+        .formatted-answer .insights-header {
+            color: #a5b4fc;
+            font-weight: 700;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .formatted-answer .insight-item {
+            color: #e5e7eb;
+            margin-bottom: 0.75rem;
+            padding-left: 1.5rem;
+            position: relative;
+            font-size: 0.925rem;
+        }
+        
+        .formatted-answer .insight-item:before {
+            content: "▸";
+            position: absolute;
+            left: 0;
+            color: #818cf8;
+            font-weight: bold;
+        }
+        
+        .formatted-answer .insight-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .formatted-answer .metric-highlight {
+            color: #a5f3fc;
+            font-weight: 600;
+        }
+        
+        .formatted-answer .currency {
+            color: #86efac;
+        }
+
+        .formatted-answer .product-name {
+            color: #c7d2fe; /* A light indigo/purple */
+            font-weight: 700; /* Bold */
+        }
+        
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 flex h-screen antialiased">
+
+    <div class="w-64 bg-gray-950 flex-shrink-0 flex flex-col p-6 border-r border-gray-700">
+        <div class="flex items-center space-x-3 mb-8">
+            <svg class="w-10 h-10 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0 0 20.25 18V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v12A2.25 2.25 0 0 0 6 20.25Z" />
+            </svg>
+            <h1 class="text-2xl font-bold text-white">QuerySense AI</h1>
+        </div>
+        
+        <p class="text-sm text-gray-400 mb-6">
+            Ask me anything about the import/export data. I can provide answers, tables, and charts with insights.
+        </p>
+        
+        <div class="flex-grow text-gray-400 text-sm">
+            <h2 class="font-semibold text-gray-200 mb-2">Example Queries:</h2>
+            <ul class="list-disc list-inside space-y-2">
+                <li>Provide me full data of importing dimerfattyacid from Jan 2024 till today</li>
+                <li>Analyze companies exporting zinc products</li>
+                <li>Show me a chart of the import costs for 2024</li>
+                <li>What's the total value of all exports?</li>
+                <li>Compare air vs sea shipments</li>
+            </ul>
+        </div>
+        
+        <div class="text-xs text-gray-600">&copy; 2025 Enterprise Project</div>
+    </div>
+
+    <div class="flex-1 flex flex-col min-w-0">
+        <div id="chat-container" class="flex-1 p-6 overflow-y-auto space-y-6">
+            <div class="flex items-start space-x-3">
+                <div class="w-10 h-10 bg-indigo-500 rounded-full flex-shrink-0 flex items-center justify-center font-bold">A</div>
+                <div class="bg-gray-800 p-4 rounded-lg shadow-md max-w-2xl">
+                    <p class="font-semibold text-indigo-300 mb-1">QuerySense AI</p>
+                    <p>Hello! I'm ready to analyze the import/export data and provide insights. How can I help you today?</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="border-t border-gray-700 p-6 bg-gray-900">
+            <form id="chat-form" class="flex items-center space-x-4">
+                <input type="text" id="message-input" placeholder="Type your query here..."
+                       class="flex-1 bg-gray-700 border border-gray-600 rounded-full px-5 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                <button type="submit" id="send-button"
+                        class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-full p-3 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900">
+                    <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+                    </svg>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // SECTION 6: JavaScript - Main Chat Logic
+        // ============================================================
+        
+        const chatContainer = document.getElementById('chat-container');
+        const chatForm = document.getElementById('chat-form');
+        const messageInput = document.getElementById('message-input');
+        let chatHistory = [];
+
+        // ============================================================
+        // FUNCTION: Handle Form Submission
+        // ============================================================
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            addMessageToChat('user', { message: message });
+            messageInput.value = '';
+            
+            // Show loading indicator with streaming placeholder
+            const loadingId = showLoadingIndicator();
+
+            try {
+                const historyForApi = chatHistory.slice(-6);
+                chatHistory.push({ role: 'user', content: message });
+
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message, history: historyForApi }),
+                });
+
+                removeLoadingIndicator(loadingId);
+
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                const result = await response.json();
+                chatHistory.push({ role: 'bot', content: result.answer });
+                
+                // Add message with streaming effect
+                addMessageToChatWithStreaming('bot', result);
+
+            } catch (error) {
+                console.error('Error fetching chat response:', error);
+                removeLoadingIndicator(loadingId);
+                addMessageToChat('bot', { answer: `Sorry, I encountered an error: ${error.message}` });
+                chatHistory.pop();
+            }
+        });
+
+        // ============================================================
+        // FUNCTION: Add Message with Streaming Effect
+        // ============================================================
+        async function addMessageToChatWithStreaming(sender, result) {
+            const messageId = `msg-${Date.now()}`;
+            const messageElement = document.createElement('div');
+            messageElement.className = 'flex items-start space-x-3';
+            
+            const data = result.data || [];
+            const query = result.query || '';
+            const queryType = result.query_type || 'analytical'; // <-- NEW
+            const chartTitle = result.chart_title || '';
+            const isTimeSeries = result.is_time_series || false;
+
+            // Create the basic structure
+            let html = `
+                <div class="w-10 h-10 bg-indigo-500 rounded-full flex-shrink-0 flex items-center justify-center font-bold">A</div>
+                <div class="bg-gray-800 p-4 rounded-lg shadow-md flex-1 min-w-0" style="max-width: 95%;">
+                    <p class="font-semibold text-indigo-300 mb-2">QuerySense AI</p>
+                    <div id="streaming-answer-${messageId}" class="formatted-answer text-gray-100"></div>
+                    
+                    ${query ? `
+                        <details class="mt-4 bg-gray-900 p-2 rounded-md">
+                            <summary class="text-xs text-gray-400 cursor-pointer">View Generated SQL</summary>
+                            <pre class="text-xs text-gray-300 p-2 overflow-x-auto"><code>${query}</code></pre>
+                        </details>
+                    ` : ''}
+
+                    ${data.length > 0 ? `
+                        <div class="mt-4 space-y-4">
+                            ${chartTitle ? `<h5 class="chart-title" style="color: #e5e7eb; text-align: center; font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem;">${chartTitle}</h5>` : ''}
+                            
+                            <div id="controls-${messageId}" class="mb-2" style="display: none;">
+                                <button id="download-${messageId}" class="text-xs bg-green-600 hover:bg-green-500 text-white py-1.5 px-3 rounded-full font-semibold transition-colors">
+                                    ⬇️ Download Excel (.xlsx)
+                                </button>
+                            </div>
+                            <div id="table-info-${messageId}" class="text-sm text-gray-400 mb-1" style="display: none;"></div>
+                            <div id="table-${messageId}" class="text-gray-900" style="display: none;"></div>
+                            <div id="chart-wrapper-${messageId}" style="display: none;">
+                                <div class="chart-wrapper">
+                                    <div id="chart-container-${messageId}" class="chart-container">
+                                        <canvas id="chart-${messageId}"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            messageElement.innerHTML = html;
+            chatContainer.appendChild(messageElement);
+
+            // Scroll to the new message but keep some space at bottom
+            const answerDiv = document.getElementById(`streaming-answer-${messageId}`);
+            answerDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            // Stream the answer text
+            await streamText(result.answer, `streaming-answer-${messageId}`);
+
+            // After text is done, render visualizations
+            if (data.length > 0) {
+                renderVisualizations(messageId, data, queryType, chartTitle, isTimeSeries);
+            }
+            
+            // Handle export job if present
+            if (result.export_job_id) {
+                const jobId = result.export_job_id;
+
+                const container = document.createElement("div");
+                container.className = "mt-4 w-full";
+
+                container.innerHTML = `
+                    <div class="text-sm text-gray-300 mb-2">Preparing large dataset... please wait</div>
+                    <div class="w-full bg-gray-700 h-3 rounded-full overflow-hidden">
+                        <div id="bar-${jobId}" class="bg-indigo-500 h-3 w-0 transition-all duration-500"></div>
+                    </div>
+                    <div id="label-${jobId}" class="text-xs text-gray-400 mt-2 text-right">0%</div>
+                `;
+
+                messageElement.querySelector(".bg-gray-800").appendChild(container);
+
+                const barEl = document.getElementById(`bar-${jobId}`);
+                const labelEl = document.getElementById(`label-${jobId}`);
+
+                const interval = setInterval(async () => {
+                    const res = await fetch(`/export_status/${jobId}`);
+                    const status = await res.json();
+
+                    if (status.status === "processing") {
+                        barEl.style.width = `${status.progress}%`;
+                        labelEl.innerText = `${status.progress}%`;
+                    }
+
+                    if (status.status === "ready") {
+                        clearInterval(interval);
+                        barEl.style.width = "100%";
+                        labelEl.innerHTML = `
+                            ✅ Ready — 
+                            <a href="/download/${status.file}" class="text-green-400 underline font-semibold">
+                                Download Excel (.xlsx)
+                            </a>
+                        `;
+                    }
+
+                    if (status.status === "error") {
+                        clearInterval(interval);
+                        barEl.style.backgroundColor = "red";
+                        labelEl.innerText = "❌ Error while generating file.";
+                    }
+                }, 2000);
+            }
+        }
+
+        // ============================================================
+        // FUNCTION: Stream Text Character by Character
+        // ============================================================
+        async function streamText(text, elementId) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+
+            // Split text to check for sections
+            const parts = text.split('\n\n');
+            const intro = parts[0];
+            const insightsPart = parts.slice(1).join(' ');
+
+            // Stream intro first
+            let introHtml = '<div class="intro-text">';
+            for (let i = 0; i < intro.length; i++) {
+                introHtml += intro[i];
+                element.innerHTML = introHtml + '</div>';
+                
+                // Keep the message in view while typing
+                element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                
+                // Faster streaming (10ms per character)
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
+            introHtml += '</div>';
+            
+            // If there are insights, format and stream them
+            if (insightsPart && parts.length > 1) {
+                const sentences = insightsPart
+                    .split(/\.\s+/)
+                    .filter(s => s.trim().length > 0)
+                    .map(s => s.trim() + (s.endsWith('.') ? '' : '.'));
+
+                const formatSentence = (sentence) => {
+                    return sentence
+                        // NEW: Finds ALL CAPS product names (e.g., ZINC PICOLINATE)
+                        .replace(/\b([A-Z][A-Z\s\-]{2,}[A-Z])\b/g, '<span class="product-name">$1</span>')
+
+                        // Finds currency (now that agent.py sends the ₹)
+                        .replace(/₹([\d,]+(?:\.\d{2})?)/g, '<span class="currency">₹$1</span>')
+
+                        // Finds other metrics (UPDATED: added 'per KG')
+                        .replace(/\b(\d+(?:,\d+)*(?:\.\d+)?)\s*(companies|records|days|KG|kg|per KG)\b/gi, 
+                                '<span class="metric-highlight">$1 $2</span>')
+
+                        // Finds percentages
+                        .replace(/\b(\d+(?:\.\d+)?%)\b/g, '<span class="metric-highlight">$1</span>');
+                };
+
+                // Start building insights section
+                let insightsHtml = `
+                    <div class="insights-section">
+                        <div class="insights-header">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            Key Insights
+                        </div>
+                `;
+
+                // Stream each insight sentence
+                for (let sentenceIdx = 0; sentenceIdx < sentences.length; sentenceIdx++) {
+                    const sentence = sentences[sentenceIdx];
+                    let currentInsight = '<div class="insight-item">';
+                    
+                    for (let i = 0; i < sentence.length; i++) {
+                        currentInsight += sentence[i];
+                        const formattedInsight = formatSentence(currentInsight + '</div>');
+                        
+                        // Build full HTML with all previous sentences
+                        // let fullInsightsHtml = insightsHtml;
+                        // for (let j = 0; j < sentenceIdx; j++) {
+                        //     fullInsightsHtml += `<div class="insight-item">${formatSentence(sentences[j])}</div>`;
+                        // }
+                        // fullInsightsHtml += formattedInsight + '</div>';
+                        
+                        // element.innerHTML = introHtml + fullInsightsHtml;
+
+                        element.innerHTML = introHtml + insightsHtml + formattedInsight;
+                        element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        
+                        await new Promise(resolve => setTimeout(resolve, 10));
+                    }
+                    
+                    currentInsight += '</div>';
+                    insightsHtml += `<div class="insight-item">${formatSentence(sentence)}</div>`;
+                }
+
+                insightsHtml += '</div>';
+                element.innerHTML = introHtml + insightsHtml;
+            } else {
+                element.innerHTML = introHtml;
+            }
+        }
+
+        // ============================================================
+        // FUNCTION: Format Answer with Better Readability
+        // ============================================================
+        function formatAnswer(answerText) {
+            if (!answerText) return '';
+            
+            // Split by double newlines to separate intro from insights
+            const parts = answerText.split('\n\n');
+            
+            if (parts.length === 1) {
+                // Simple answer without insights
+                return `<div class="intro-text">${answerText}</div>`;
+            }
+            
+            // First part is the intro
+            const intro = parts[0];
+            
+            // Remaining parts are insights - split by sentences
+            const insightsPart = parts.slice(1).join(' ');
+            
+            // Split insights into sentences (basic split on '. ')
+            const sentences = insightsPart
+                .split(/\.\s+/)
+                .filter(s => s.trim().length > 0)
+                .map(s => s.trim() + (s.endsWith('.') ? '' : '.'));
+            
+            // Format numbers with currency symbols
+            const formatSentence = (sentence) => {
+                return sentence
+                    .replace(/₹([\d,]+(?:\.\d{2})?)/g, '<span class="currency">₹$1</span>')
+                    .replace(/\b(\d+(?:,\d+)*(?:\.\d+)?)\s*(companies|records|days|KG|kg)\b/gi, 
+                             '<span class="metric-highlight">$1 $2</span>')
+                    .replace(/\b(\d+(?:\.\d+)?%)\b/g, '<span class="metric-highlight">$1</span>');
+            };
+            
+            // Build formatted HTML
+            let html = `<div class="intro-text">${intro}</div>`;
+            
+            if (sentences.length > 0) {
+                html += `
+                    <div class="insights-section">
+                        <div class="insights-header">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            Key Insights
+                        </div>
+                `;
+                
+                sentences.forEach(sentence => {
+                    html += `<div class="insight-item">${formatSentence(sentence)}</div>`;
+                });
+                
+                html += `</div>`;
+            }
+            
+            return html;
+        }
+
+        // ============================================================
+        // FUNCTION: Add Message Bubble to Chat
+        // ============================================================
+        function addMessageToChat(sender, result) {
+            const messageId = `msg-${Date.now()}`;
+            const messageElement = document.createElement('div');
+            messageElement.className = 'flex items-start space-x-3';
+            
+            let html = '';
+            const data = result.data || [];
+            const query = result.query || '';
+            const queryType = result.query_type || 'analytical';
+            const chartTitle = result.chart_title || '';
+            const isTimeSeries = result.is_time_series || false;
+
+            if (sender === 'user') {
+                html = `
+                    <div class="flex-grow"></div>
+                    <div class="bg-indigo-600 p-4 rounded-lg shadow-md max-w-2xl">
+                        <p class="font-semibold text-indigo-100 mb-1">You</p>
+                        <p class="text-white">${result.message}</p>
+                    </div>
+                    <div class="w-10 h-10 bg-gray-600 rounded-full flex-shrink-0 flex items-center justify-center font-bold">U</div>
+                `;
+            } 
+            else {
+                html = `
+                    <div class="w-10 h-10 bg-indigo-500 rounded-full flex-shrink-0 flex items-center justify-center font-bold">A</div>
+                    <div class="bg-gray-800 p-4 rounded-lg shadow-md flex-1 min-w-0" style="max-width: 95%;">
+                        <p class="font-semibold text-indigo-300 mb-2">QuerySense AI</p>
+                        <div class="formatted-answer text-gray-100">${formatAnswer(result.answer)}</div>
+                        
+                        ${query ? `
+                            <details class="mt-4 bg-gray-900 p-2 rounded-md">
+                                <summary class="text-xs text-gray-400 cursor-pointer">View Generated SQL</summary>
+                                <pre class="text-xs text-gray-300 p-2 overflow-x-auto"><code>${query}</code></pre>
+                            </details>
+                        ` : ''}
+
+                        ${data.length > 0 ? `
+                            <div class="mt-4 space-y-4">
+                                ${chartTitle ? `<h5 class="chart-title" style="color: #e5e7eb; text-align: center; font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem;">${chartTitle}</h5>` : ''}
+                                
+                                <div id="controls-${messageId}" class="mb-2" style="display: none;">
+                                    <button id="download-${messageId}" class="text-xs bg-green-600 hover:bg-green-500 text-white py-1.5 px-3 rounded-full font-semibold transition-colors">
+                                        ⬇️ Download Excel (.xlsx)
+                                    </button>
+                                </div>
+                                <div id="table-info-${messageId}" class="text-sm text-gray-400 mb-1" style="display: none;"></div>
+                                <div id="table-${messageId}" class="text-gray-900" style="display: none;"></div>
+                                <div id="chart-wrapper-${messageId}" style="display: none;">
+                                    <div class="chart-wrapper">
+                                        <div id="chart-container-${messageId}" class="chart-container">
+                                            <canvas id="chart-${messageId}"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+            
+            messageElement.innerHTML = html;
+            chatContainer.appendChild(messageElement);
+
+            if (sender === 'bot' && data.length > 0) {
+                renderVisualizations(messageId, data, queryType, chartTitle, isTimeSeries);
+            }
+            
+            if (result.export_job_id) {
+                const jobId = result.export_job_id;
+
+                const container = document.createElement("div");
+                container.className = "mt-4 w-full";
+
+                container.innerHTML = `
+                    <div class="text-sm text-gray-300 mb-2">Preparing large dataset... please wait</div>
+                    <div class="w-full bg-gray-700 h-3 rounded-full overflow-hidden">
+                        <div id="bar-${jobId}" class="bg-indigo-500 h-3 w-0 transition-all duration-500"></div>
+                    </div>
+                    <div id="label-${jobId}" class="text-xs text-gray-400 mt-2 text-right">0%</div>
+                `;
+
+                messageElement.querySelector(".bg-gray-800").appendChild(container);
+
+                const barEl = document.getElementById(`bar-${jobId}`);
+                const labelEl = document.getElementById(`label-${jobId}`);
+
+                const interval = setInterval(async () => {
+                    const res = await fetch(`/export_status/${jobId}`);
+                    const status = await res.json();
+
+                    if (status.status === "processing") {
+                        barEl.style.width = `${status.progress}%`;
+                        labelEl.innerText = `${status.progress}%`;
+                    }
+
+                    if (status.status === "ready") {
+                        clearInterval(interval);
+                        barEl.style.width = "100%";
+                        labelEl.innerHTML = `
+                            ✅ Ready — 
+                            <a href="/download/${status.file}" class="text-green-400 underline font-semibold">
+                                Download Excel (.xlsx)
+                            </a>
+                        `;
+                    }
+
+                    if (status.status === "error") {
+                        clearInterval(interval);
+                        barEl.style.backgroundColor = "red";
+                        labelEl.innerText = "❌ Error while generating file.";
+                    }
+                }, 2000);
+            }
+
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // ============================================================
+        // FUNCTION: Decide Which Visualizations to Show
+        // ============================================================
+        function renderVisualizations(messageId, data, queryType, chartTitle, isTimeSeries) {
+            const tableEl = document.getElementById(`table-${messageId}`);
+            const chartWrapperEl = document.getElementById(`chart-wrapper-${messageId}`);
+            const chartContainerEl = document.getElementById(`chart-container-${messageId}`);
+            const controlsEl = document.getElementById(`controls-${messageId}`);
+            
+            if (queryType === "data_pull") {
+                // For "data_pull", show the table and download button. No chart.
+                tableEl.style.display = 'block';
+                controlsEl.style.display = 'block';
+                renderTable(`table-${messageId}`, data);
+                attachDownloadHandler(`download-${messageId}`, data, chartTitle);
+                return;
+            }
+
+            if (queryType === "comparison") {
+            // UPDATED: For "comparison", show the chart, table, and download button.
+            tableEl.style.display = 'block';
+            controlsEl.style.display = 'block';
+            chartWrapperEl.style.display = 'block';
+            renderTable(`table-${messageId}`, data);
+            attachDownloadHandler(`download-${messageId}`, data, chartTitle);
+            renderChart(`chart-${messageId}`, data, chartContainerEl);
+            return;
+        }
+
+            if (isTimeSeries) {
+                // For "is_time_series", show chart, table & download button.
+                tableEl.style.display = 'block';
+                controlsEl.style.display = 'block';
+                chartWrapperEl.style.display = 'block';
+                renderTable(`table-${messageId}`, data);
+                attachDownloadHandler(`download-${messageId}`, data, chartTitle);
+                renderChart(`chart-${messageId}`, data, chartContainerEl, isTimeSeries);
+                return;
+            }
+
+            // This handles the "analytical" queryType
+            
+            if (data.length === 1) {
+                // For single-value results (e.g., "total value"), show only the 1x1 table.
+                tableEl.style.display = 'block';
+                controlsEl.style.display = 'block';
+                renderTable(`table-${messageId}`, data);
+                attachDownloadHandler(`download-${messageId}`, data, chartTitle);
+                return;
+            }
+
+            if (data.length <= 15) {
+                // For "analytical" with 2-15 rows, show both chart and table.
+                tableEl.style.display = 'block';
+                controlsEl.style.display = 'block';
+                chartWrapperEl.style.display = 'block';
+                renderTable(`table-${messageId}`, data);
+                attachDownloadHandler(`download-${messageId}`, data, chartTitle);
+                renderChart(`chart-${messageId}`, data, chartContainerEl);
+                return;
+            }
+            
+            // For "analytical" with > 15 rows, show only the chart.
+            chartWrapperEl.style.display = 'block';
+            renderChart(`chart-${messageId}`, data, chartContainerEl, isTimeSeries);
+
+        }
+
+        // ============================================================
+        // FUNCTION: Show Loading Animation
+        // ============================================================
+        function showLoadingIndicator() {
+            const loadingId = `loading-${Date.now()}`;
+            const loadingElement = document.createElement('div');
+            loadingElement.id = loadingId;
+            loadingElement.className = 'flex items-start space-x-3';
+            loadingElement.innerHTML = `
+                <div class="w-10 h-10 bg-indigo-500 rounded-full flex-shrink-0 flex items-center justify-center font-bold">A</div>
+                <div class="bg-gray-800 p-4 rounded-lg shadow-md">
+                    <div class="flex space-x-1">
+                        <div class="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style="animation-delay: 0s;"></div>
+                        <div class="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style="animation-delay: 0.1s;"></div>
+                        <div class="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style="animation-delay: 0.2s;"></div>
+                    </div>
+                </div>
+            `;
+            chatContainer.appendChild(loadingElement);
+            
+            // Smooth scroll to loading indicator
+            loadingElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            
+            return loadingId;
+        }
+
+        // ============================================================
+        // FUNCTION: Remove Loading Animation
+        // ============================================================
+        function removeLoadingIndicator(loadingId) {
+            const loadingElement = document.getElementById(loadingId);
+            if (loadingElement) loadingElement.remove();
+        }
+
+        // ============================================================
+        // FUNCTION: Attach Excel Download Handler
+        // ============================================================
+        function attachDownloadHandler(buttonId, data, chartTitle) {
+            const downloadButton = document.getElementById(buttonId);
+            if (!downloadButton) return;
+            
+            const fileName = (chartTitle ? chartTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'export') + `_${new Date().toISOString().split('T')[0]}`;
+
+            downloadButton.addEventListener('click', () => {
+                try {
+                    const wb = XLSX.utils.book_new();
+                    
+                    if (!data || data.length === 0) {
+                        throw new Error("No data to export.");
+                    }
+                    
+                    const headers = Object.keys(data[0]);
+                    const headerRow = headers.map(h => ({ v: h, t: 's' }));
+                    const aoa = [headerRow];
+
+                    data.forEach(row => {
+                        const rowArray = headers.map(header => {
+                            const value = row[header];
+
+                            if (value === null || value === undefined) {
+                                return { v: '', t: 's' };
+                            }
+
+                            if (header === 'BE_Number' || header === 'HS_Code') {
+                                return { v: String(value), t: 's' };
+                            }
+                            
+                            if (typeof value === 'number') {
+                                return { v: value, t: 'n' };
+                            } 
+                            if (value instanceof Date) {
+                                return { v: value, t: 'd' };
+                            }
+                            
+                            return { v: String(value), t: 's' };
+                        });
+                        aoa.push(rowArray);
+                    });
+
+                    const ws = XLSX.utils.aoa_to_sheet(aoa);
+                    
+                    const colWidths = headers.map((h, i) => {
+                        let max_width = h.length;
+                        for (let j = 1; j < aoa.length; j++) {
+                             const cell_val = aoa[j][i].v;
+                             if (cell_val) {
+                                 const cell_width = cell_val.toString().length;
+                                 if (cell_width > max_width) {
+                                     max_width = cell_width;
+                                 }
+                             }
+                        }
+                        return { wch: Math.min(Math.max(max_width, 10), 50) }; 
+                    });
+                    ws['!cols'] = colWidths;
+
+                    XLSX.utils.book_append_sheet(wb, ws, 'Data');
+                    XLSX.writeFile(wb, fileName + '.xlsx');
+
+                } catch (err) {
+                    console.error("Error generating Excel file:", err);
+                    alert("Sorry, there was an error generating the Excel file.");
+                }
+            });
+        }
+
+        // ============================================================
+        // HELPER: Format Numbers with Indian Comma System
+        // ============================================================
+        function formatIndianNumber(num) {
+            if (num === null || num === undefined || num === '') return '';
+            
+            const number = typeof num === 'string' ? parseFloat(num) : num;
+            
+            if (isNaN(number)) return num;
+            
+            const rounded = Math.round(number * 100) / 100;
+            
+            const parts = rounded.toString().split('.');
+            let integerPart = parts[0];
+            const decimalPart = parts[1] || '';
+            
+            const isNegative = integerPart.startsWith('-');
+            if (isNegative) {
+                integerPart = integerPart.substring(1);
+            }
+            
+            let formatted = '';
+            if (integerPart.length <= 3) {
+                formatted = integerPart;
+            } else {
+                const lastThree = integerPart.substring(integerPart.length - 3);
+                const remaining = integerPart.substring(0, integerPart.length - 3);
+                
+                formatted = remaining.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' + lastThree;
+            }
+            
+            if (isNegative) {
+                formatted = '-' + formatted;
+            }
+            
+            if (decimalPart || (number % 1 !== 0)) {
+                formatted += '.' + (decimalPart + '00').substring(0, 2);
+            }
+            
+            return formatted;
+        }
+
+        // ============================================================
+        // FUNCTION: Render Data Table
+        // ============================================================
+        function renderTable(tableId, data) {
+            const tableContainer = document.getElementById(tableId);
+            
+            const messageId = tableId.replace('table-', '');
+            const tableInfoContainer = document.getElementById(`table-info-${messageId}`);
+
+            if (!tableContainer || !tableInfoContainer) return;
+
+            tableInfoContainer.innerText = `Displaying ${data.length} rows.`;
+            tableInfoContainer.style.display = 'block';
+
+            const headers = Object.keys(data[0]);
+
+            // --- DEBUGGING: Check the keys in Console (F12) ---
+            console.log("Table Headers found:", headers);
+            
+            // --- Detect Context (Import vs Export) ---
+            // We check if the dataset contains columns specific to Imports or Exports to render Impoter_Name or Exporter_Name to the table header
+            const isImport = headers.some(h => {
+                const low = h.toLowerCase();
+                return low.includes('be_') || low === 'importer_city' || low === 'importer_state';
+            });
+            
+            const isExport = headers.some(h => {
+                const low = h.toLowerCase();
+                return low.includes('sb_') || low === 'exporter_city' || low === 'exporter_state';
+            });
+
+            console.log("Context Detected:", { isImport, isExport });
+
+            // Define columns that should use Indian comma formatting
+            const noCommaColumns = [
+                'be_number', 'sb_number', 'hs_code', 
+                'ice', 'iec', 'id', 'iec/ice_code', 'IEC/ICE_Code', 'IEC/ICE Code',
+            ];
+            
+            let tableHtml = `
+                <div class="max-h-80 overflow-auto border border-gray-300 rounded-lg" style="max-width: 100%; overflow-x: auto;">
+                    <table class="divide-y divide-gray-200" style="width: max-content; min-width: 100%;">
+                        <thead class="bg-gray-50 sticky top-0">
+                            <tr>
+            `;
+            
+            headers.forEach(header => {
+                let headerLabel = header.replace(/_/g, ' ');
+                const headerLower = header.toLowerCase();
+
+                // --- Rename Header Display (Case-Insensitive) ---
+                if (headerLower === 'importer/exporter_name') {
+                    if (isImport) {
+                        headerLabel = 'Importer Name';
+                        console.log("-> Renaming header to Importer Name");
+                    } else if (isExport) {
+                        headerLabel = 'Exporter Name';
+                        console.log("-> Renaming header to Exporter Name");
+                    }
+                }
+
+                tableHtml += `<th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">${headerLabel}</th>`;
+            });
+            
+            tableHtml += `</tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
+            
+            data.forEach(row => {
+                tableHtml += `<tr>`;
+                headers.forEach(header => {
+                    let cellData = row[header];
+                    
+                    if (cellData !== null && cellData !== undefined) {
+                    const headerLower = header.toLowerCase(); // For case-insensitive check
+                    
+                    // Check if the column IS in the blacklist
+                    if (noCommaColumns.includes(headerLower)) {
+                        // It's an ID column. Convert to string, handling scientific notation.
+                        if (typeof cellData === 'number') {
+                            cellData = cellData.toFixed(0); 
+                        } else {
+                            cellData = String(cellData);
+                        }
+                    } 
+                    // Check if the cell value IS numeric (and not an empty string)
+                    else if (typeof cellData === 'number' || (typeof cellData === 'string' && cellData.trim() !== '' && !isNaN(parseFloat(cellData)) && isFinite(cellData))) {
+                        // It's a number and NOT in the blacklist, so format it.
+                        cellData = formatIndianNumber(cellData);
+                    }
+                    // It's a non-numeric string (like a date or name), just convert to string.
+                    else {
+                        cellData = String(cellData);
+                    }
+                } else {
+                    cellData = ''; // Handle null/undefined
+                }
+                    
+                    tableHtml += `<td class="px-4 py-2 text-sm text-gray-700 whitespace-nowrap">${cellData}</td>`;
+                });
+                tableHtml += `</tr>`;
+            });
+            
+            tableHtml += `</tbody></table></div>`;
+            tableContainer.innerHTML = tableHtml;
+        }
+
+        // ============================================================
+        // FUNCTION: Render Chart (Bar/Line/Pie) with Dynamic Sizing
+        // ============================================================
+        function renderChart(canvasId, data, containerEl, isExplicitTimeSeries = false) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+
+            const existingChart = Chart.getChart(ctx);
+            if (existingChart) existingChart.destroy();
+
+            if (!data || data.length === 0) return;
+
+            const keys = Object.keys(data[0]);
+            let chartType = 'bar';
+            let labels = [];
+            let datasets = [];
+            let indexAxis = 'x';
+
+            // Identify generic Label and Value columns
+            const labelKey = keys.find(k => typeof data[0][k] === 'string' || typeof data[0][k] === 'number'); 
+            const valueKey = keys.find(k => typeof data[0][k] === 'number' && k !== labelKey);
+            
+            // Helper to find date columns by name
+            const dateKey = keys.find(k => {
+                const lower = k.toLowerCase();
+                return lower === 'date' || lower.endsWith('_date') ||
+                       lower === 'period' || // Added 'period'
+                       lower === 'month' || lower.endsWith('_month') ||
+                       lower === 'year' || lower.endsWith('_year') ||
+                       lower === 'day' || lower.endsWith('_day') ||
+                       lower.includes('time');
+            });
+
+            // --- CHART TYPE 1: Time Series (Line Chart) ---
+            // FIX: Check 'isExplicitTimeSeries' OR valid dateKey
+            if ((isExplicitTimeSeries || dateKey) && valueKey) {
+                chartType = 'line';
+                
+                // If explicit, use the first column as the X-axis label if no specific dateKey found
+                const xKey = dateKey || keys[0]; 
+
+                // Sort by date/index to ensure line flows left-to-right
+                const sortedData = [...data].sort((a, b) => {
+                    const dateA = new Date(a[xKey]);
+                    const dateB = new Date(b[xKey]);
+                    // If valid dates, sort by date. If numbers (months 1-12), sort numerically.
+                    if (!isNaN(dateA) && !isNaN(dateB)) return dateA - dateB;
+                    return a[xKey] - b[xKey];
+                });
+                
+                labels = sortedData.map(row => {
+                   // Try to format if it looks like a date, otherwise return raw
+                   const val = row[xKey];
+                   const date = new Date(val);
+                   if (!isNaN(date) && typeof val !== 'number') {
+                       return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                   }
+                   return val; // Return "Jan", "Feb", or "1", "2" as is
+                });
+                
+                datasets = [{
+                    label: valueKey.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim(),
+                    data: sortedData.map(row => row[valueKey]),
+                    borderColor: 'rgb(99, 102, 241)',
+                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }];
+            }
+            // --- CHART TYPE 2: Pie Chart (≤5 Categories) ---
+            else if (labelKey && valueKey && data.length <= 5 && !isExplicitTimeSeries) {
+                chartType = 'pie';
+                labels = data.map(row => row[labelKey]);
+                datasets = [{
+                    label: valueKey.replace(/_/g, ' '),
+                    data: data.map(row => row[valueKey]),
+                    backgroundColor: labels.map((_, i) => `hsl(${i * 60 % 360}, 70%, 60%)`)
+                }];
+            }
+            // --- CHART TYPE 3: Bar Chart (Multiple Metrics) ---
+            else if (labelKey && valueKey) {
+                const useHorizontal = data.length >= 10;
+                chartType = 'bar';
+                indexAxis = useHorizontal ? 'y' : 'x';
+
+                if (useHorizontal) {
+                    const minHeight = Math.max(320, data.length * 35);
+                    containerEl.style.height = `${minHeight}px`;
+                }
+                
+                labels = data.map(row => {
+                    const label = row[labelKey];
+                    return (typeof label === 'string' && label.length > 30 && !useHorizontal) 
+                        ? label.substring(0, 30) + '...' 
+                        : label;
+                });
+                
+                // Find all numeric columns for datasets (excluding ID-like columns if needed)
+                const numericKeys = keys.filter(k => typeof data[0][k] === 'number' && k !== labelKey);
+                
+                datasets = numericKeys.map((key, idx) => ({
+                    label: key.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim(),
+                    data: data.map(row => row[key]),
+                    backgroundColor: `hsla(${220 + idx * 40}, 70%, 60%, 0.7)`,
+                    borderColor: `hsl(${220 + idx * 40}, 70%, 50%)`,
+                    borderWidth: 2
+                }));
+            }
+
+            // --- Create Chart with Chart.js ---
+            new Chart(ctx.getContext('2d'), {
+                type: chartType,
+                data: { labels, datasets },
+                options: {
+                    indexAxis: indexAxis,
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    layout: { padding: { top: 20, bottom: 20, left: 10, right: 10 } },
+                    plugins: {
+                        legend: { 
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: chartType !== 'pie' ? {
+                        y: { beginAtZero: true },
+                        x: { ticks: { autoSkip: true, maxTicksLimit: 15 } }
+                    } : {}
+                }
+            });
+        }
+    </script>
+</body>
+</html>

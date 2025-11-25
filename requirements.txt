@@ -1,0 +1,7 @@
+flask 
+python-dotenv 
+sqlalchemy 
+pyodbc 
+google-generativeai 
+pandas 
+xlsxwriter
